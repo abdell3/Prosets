@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AssetMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  role      UserRole @default(BUYER)
+  createdAt DateTime @default(now())
+
+  assets Asset[] @relation("SellerAssets")
+  orders Order[] @relation("BuyerOrders")
+}
+
+model Category {
+  id   String @id @default(uuid())
+  name String @unique
+
+  assets Asset[]
+}
+
+model Asset {
+  id          String      @id @default(uuid())
+  title       String
+  description String
+  priceCents  Int
+  currency    String      @default("usd")
+  status      AssetStatus @default(ACTIVE)
+  categoryId  String
+  sellerId    String
+  createdAt   DateTime    @default(now())
+
+  seller     User         @relation("SellerAssets", fields: [sellerId], references: [id])
+  category   Category     @relation(fields: [categoryId], references: [id])
+  medias     AssetMedia[]
+  file       AssetFile?
+  orderItems OrderItem[]
+}
+
+model AssetMedia {
+  id        String         @id @default(uuid())
+  assetId   String
+  type      AssetMediaType
+  url       String
+  createdAt DateTime       @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+model AssetFile {
+  id           String @id @default(uuid())
+  assetId      String @unique
+  s3Key        String
+  originalName String
+  sizeBytes    Int
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  buyerId         String
+  status          OrderStatus @default(PENDING)
+  totalCents      Int
+  currency        String      @default("usd")
+  stripeSessionId String?     @unique
+  paymentIntentId String?
+  createdAt       DateTime    @default(now())
+
+  buyer User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  items OrderItem[]
+}
+
+model OrderItem {
+  id         String @id @default(uuid())
+  orderId    String
+  assetId    String
+  priceCents Int
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id])
+}

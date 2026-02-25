@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: prosets-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: prosets
+      POSTGRES_USER: prosets_user
+      POSTGRES_PASSWORD: prosets_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prosets_user -d prosets"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prosets-api
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://prosets_user:prosets_password@postgres:5432/prosets?schema=public
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN:-your-domain.auth0.com}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-https://your-api-identifier}
+      AUTH0_ISSUER: ${AUTH0_ISSUER:-https://your-domain.auth0.com/}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_...}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_...}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_...}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-your-access-key}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-your-secret-key}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET_PUBLIC: ${AWS_S3_BUCKET_PUBLIC:-prosets-previews}
+      AWS_S3_BUCKET_PRIVATE: ${AWS_S3_BUCKET_PRIVATE:-prosets-sources}
+      PORT: 3000
+      NODE_ENV: development
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./package.json:/app/package.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tsconfig.build.json:/app/tsconfig.build.json
+      - ./nest-cli.json:/app/nest-cli.json
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
